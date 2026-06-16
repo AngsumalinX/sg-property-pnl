@@ -1,0 +1,1364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SG Property P&L</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+
+  :root {
+    --bg:        #F6F8FA;
+    --surface:   #FFFFFF;
+    --surface2:  #F0F2F5;
+    --border:    rgba(0,0,0,0.08);
+    --border2:   rgba(0,0,0,0.13);
+    --txt:       #1A1F2E;
+    --txt2:      #57606A;
+    --txt3:      #6E7781;
+    --accent:    #0969DA;
+    --accent2:   #1A7FE0;
+    --green:     #1A7F37;
+    --red:       #CF222E;
+    --amber:     #9A6700;
+    --radius:    10px;
+    --radius-sm: 6px;
+  }
+
+  body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--txt); margin:0; padding:0; font-size:13px; line-height:1.5; -webkit-font-smoothing:antialiased; min-height:100vh; }
+
+  /* ── Sticky header ── */
+  #header { position:sticky; top:0; z-index:100; background:rgba(246,248,250,.97); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border-bottom:1px solid var(--border2); box-shadow:0 1px 3px rgba(0,0,0,.06); }
+
+  /* ── Ticker ── */
+  #ticker { padding:10px 24px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .t-brand { font-size:12px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--txt2); white-space:nowrap; }
+  @media (max-width:500px) {
+    #ticker { padding:8px 14px; gap:8px; flex-wrap:wrap; }
+    .t-metrics { gap:12px; }
+    .t-val { font-size:13px; }
+    .t-lbl { font-size:9px; }
+    .container { padding:16px 12px 48px; }
+    .g2, .g3, .g4, .g5 { grid-template-columns:1fr; }
+    .results-grid { grid-template-columns:1fr; }
+    .bm-hdr, .bm-viz-row { grid-template-columns:1fr 1fr 72px; }
+    .bm-hdr span:nth-child(2), .bm-viz-row > div:nth-child(2) { display:none; }
+    .bm-hdr span:nth-child(4), .bm-viz-row > div:nth-child(4) { display:none; }
+  }
+  .t-metrics { display:flex; gap:24px; align-items:center; flex-wrap:wrap; }
+  .t-metric { display:flex; flex-direction:column; align-items:flex-end; }
+  .t-lbl { font-size:10px; color:var(--txt3); letter-spacing:.05em; text-transform:uppercase; }
+  .t-val { font-size:15px; font-weight:700; font-family:'JetBrains Mono',monospace; line-height:1.2; }
+  .t-val.pos { color:var(--green); }
+  .t-val.neg { color:var(--red); }
+  .t-val.neu { color:var(--txt2); }
+
+  /* ── Tab nav ── */
+  #tab-nav { display:flex; padding:0 20px; gap:0; border-top:1px solid var(--border); overflow-x:auto; scrollbar-width:none; }
+  #tab-nav::-webkit-scrollbar { display:none; }
+  .tab-btn { background:none; border:none; border-bottom:2px solid transparent; padding:10px 18px; font-size:12px; font-weight:500; font-family:'Inter',sans-serif; color:var(--txt2); cursor:pointer; white-space:nowrap; transition:color .15s,border-color .15s; display:flex; align-items:center; gap:7px; position:relative; top:1px; }
+  .tab-btn:hover { color:var(--txt); }
+  .tab-btn.active { color:var(--accent2); border-bottom-color:var(--accent); }
+  .tab-btn .tab-num { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; font-size:9px; font-weight:700; background:var(--surface2); color:var(--txt3); flex-shrink:0; }
+  .tab-btn.active .tab-num { background:var(--accent); color:#fff; }
+
+  /* ── Step progress bar ── */
+  #step-bar { background:transparent; }
+  .step-seg {
+    flex:1; height:3px; border-radius:2px;
+    background:#D0D7DE;
+    transition:background .25s;
+  }
+  .step-seg.active { background:var(--accent); }
+  .step-seg.done   { background:#1A7F37; }
+
+  /* ── Tab content ── */
+  .container { max-width:900px; margin:0 auto; padding:24px 20px 60px; }
+  .tab-panel { display:none; }
+  .tab-panel.active { display:block; }
+
+  /* ── Nav buttons ── */
+  .tab-nav-btns { display:flex; justify-content:space-between; align-items:center; margin-top:24px; padding-top:16px; border-top:1px solid var(--border); }
+  .nav-btn { font-size:12px; font-weight:600; font-family:'Inter',sans-serif; padding:8px 20px; border-radius:var(--radius-sm); border:1px solid var(--border2); background:var(--surface2); color:var(--txt); cursor:pointer; display:flex; align-items:center; gap:6px; transition:border-color .15s,background .15s; }
+  .nav-btn:hover { border-color:var(--accent); }
+  .nav-btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .nav-btn.primary:hover { background:var(--accent2); border-color:var(--accent2); }
+
+  /* ── Cards ── */
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px 20px; margin-bottom:12px; }
+  .card:last-child { margin-bottom:0; }
+  .card-title { font-size:10px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--txt3); margin:0 0 14px; display:flex; align-items:center; gap:8px; }
+  .card-title::before { content:''; display:block; width:3px; height:12px; background:var(--accent); border-radius:2px; flex-shrink:0; }
+
+  /* ── Form elements ── */
+  .f { margin-bottom:10px; }
+  .f:last-child { margin-bottom:0; }
+  .f label { display:block; font-size:11px; color:var(--txt2); margin-bottom:4px; font-weight:500; }
+  .f input, .f select { width:100%; background:var(--bg); border:1px solid var(--border2); border-radius:var(--radius-sm); padding:8px 10px; font-size:13px; font-family:'Inter',sans-serif; color:var(--txt); outline:none; transition:border-color .15s; appearance:none; -webkit-appearance:none; }
+  .f input:focus, .f select:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(31,111,235,.15); }
+  .f input.input-err { border-color:var(--red) !important; }
+  .f select { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238B949E' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 10px center; padding-right:28px; cursor:pointer; }
+  .f input[type="date"]::-webkit-calendar-picker-indicator { cursor:pointer; opacity:0.5; }
+  .field-err { font-size:11px; color:var(--red); margin-top:4px; display:none; }
+  .field-err.show { display:block; }
+
+  .g2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .g3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+  .g4 { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  .g5 { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
+
+  /* ── Pill toggle ── */
+  .pill { display:inline-flex; background:var(--bg); border:1px solid var(--border2); border-radius:var(--radius-sm); overflow:hidden; }
+  .pill button { background:none; border:none; padding:7px 18px; font-size:12px; font-family:'Inter',sans-serif; font-weight:500; cursor:pointer; color:var(--txt2); transition:background .15s,color .15s; }
+  .pill button.active { background:var(--accent); color:#fff; }
+
+  /* ── Metric cards ── */
+  .m { background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px 16px; }
+  .ml { font-size:10px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--txt3); margin-bottom:6px; }
+  .mv { font-size:20px; font-weight:700; font-family:'JetBrains Mono',monospace; line-height:1.1; }
+  .ms { font-size:10px; color:var(--txt3); margin-top:4px; }
+  .pos { color:var(--green); }
+  .neg { color:var(--red); }
+  .neu { color:var(--txt); }
+
+  /* ── Row breakdowns ── */
+  .dv { border:none; border-top:1px solid var(--border); margin:8px 0; }
+  .r { display:flex; justify-content:space-between; align-items:center; padding:4px 0; }
+  .r .n { color:var(--txt2); font-size:12px; }
+  .r .v { font-weight:500; font-size:12px; color:var(--txt); font-family:'JetBrains Mono',monospace; }
+  .r.tot { padding-top:10px; margin-top:2px; border-top:1px solid var(--border2); }
+  .r.tot .n { color:var(--txt); font-weight:600; font-size:13px; }
+  .r.tot .v { font-size:14px; }
+  .r.sub .n { font-size:11px; padding-left:14px; color:var(--txt3); }
+  .r.sub .v { font-size:11px; color:var(--txt3); }
+
+  /* ── Badges ── */
+  .badge { display:inline-block; font-size:11px; font-weight:500; padding:2px 8px; border-radius:4px; margin:0 3px 3px 0; }
+  .bi { background:#DDF4FF; color:#0550AE; border:1px solid #B6E3FF; }
+  .bw { background:#FFF8C5; color:#7A4F00; border:1px solid #F2CC60; }
+  .bd { background:#FFEBE9; color:#82071E; border:1px solid #FFBFC9; }
+  .bs { background:#DAFBE1; color:#116329; border:1px solid #ABF2BC; }
+
+  /* ── FIX #2: Tooltip system ── */
+  .tip { display:inline-flex; align-items:center; cursor:help; }
+  .tip-icon { display:inline-flex; align-items:center; justify-content:center; width:13px; height:13px; border-radius:50%; background:var(--surface2); border:1px solid var(--border2); font-size:9px; font-weight:700; color:var(--txt3); margin-left:4px; vertical-align:middle; flex-shrink:0; }
+  .tip-icon:hover { border-color:var(--accent); color:var(--accent2); }
+  /* FIX 4: tooltip popup — clamp to viewport, never clip on right edge */
+  .tip-popup {
+    display:none; position:fixed; z-index:300;
+    background:var(--surface2); border:1px solid var(--border2);
+    border-radius:var(--radius-sm); padding:8px 12px;
+    font-size:11px; color:var(--txt2); line-height:1.5;
+    max-width:min(240px, calc(100vw - 24px));
+    box-shadow:0 4px 16px rgba(0,0,0,.12); pointer-events:none;
+  }
+  .tip-wrap { position:relative; display:inline-flex; align-items:center; }
+  .tip-wrap:hover .tip-popup { display:block; }
+
+  /* ── FIX #1: Results prompt banner at end of Tab 3 ── */
+  .results-prompt { background:#DDF4FF; border:1px solid #B6E3FF; border-radius:var(--radius); padding:16px 20px; display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:12px; }
+  .results-prompt-text { font-size:13px; color:#0550AE; }
+  .results-prompt-text span { color:#0550AE; font-weight:600; }
+
+  /* ── FIX #4: ABSD high-rate alert ── */
+  .absd-alert { background:#FFEBE9; border:1px solid #FFBFC9; border-radius:var(--radius-sm); padding:10px 14px; margin-top:8px; font-size:12px; color:#82071E; line-height:1.5; display:none; }
+  .absd-alert.show { display:block; }
+  .absd-alert strong { color:#A8071A; }
+
+  /* ── Stamp duty / sub hdrs ── */
+  .sdg { display:grid; grid-template-columns:1fr auto auto; gap:3px 16px; font-size:12px; align-items:center; }
+  .sdg-hdr { font-size:10px; color:var(--txt3); font-weight:600; letter-spacing:.05em; text-transform:uppercase; }
+  .note { font-size:10px; color:var(--txt3); margin-top:6px; line-height:1.6; }
+  .sub-hdr { font-size:10px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--txt3); margin:12px 0 4px; }
+  .sub-hdr:first-child { margin-top:0; }
+
+  /* ── Results grid ── */
+  .results-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+  .results-grid .card { margin-bottom:0; }
+
+  /* ── Benchmark ── */
+  .bm-hdr { display:grid; grid-template-columns:160px 1fr 96px 68px 80px; gap:8px; padding:0 0 8px; border-bottom:1px solid var(--border); margin-bottom:4px; }
+  .bm-hdr span { font-size:10px; font-weight:600; color:var(--txt3); letter-spacing:.06em; text-transform:uppercase; }
+  .bm-hdr span:not(:first-child) { text-align:right; }
+  .bm-hdr span:nth-child(2) { text-align:left; }
+  .bm-viz-row { display:grid; grid-template-columns:160px 1fr 96px 68px 80px; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid rgba(0,0,0,.05); }
+  .bm-viz-row:last-child { border-bottom:none; }
+  .bm-viz-row.prop-row { background:#EBF4FF; border:1px solid #B6D9F7; border-radius:var(--radius-sm); padding:8px 10px; margin:4px -10px; border-bottom:1px solid #B6D9F7; }
+  .bm-bar-track { position:relative; height:20px; background:#E8ECF0; border-radius:3px; overflow:hidden; }
+  .bm-bar-fill { position:absolute; top:0; bottom:0; border-radius:3px; transition:width .3s ease; }
+  .bm-cfg-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:14px; }
+  .bm-cfg-item { background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; }
+  .bm-cfg-name { font-size:11px; font-weight:500; color:var(--txt2); margin-bottom:5px; }
+  .bm-cfg-actuals { display:flex; gap:3px; flex-wrap:wrap; margin-bottom:5px; min-height:18px; }
+  .act-chip { font-size:10px; padding:1px 5px; border-radius:3px; font-weight:600; }
+  .act-pos { background:#DAFBE1; color:#116329; }
+  .act-neg { background:#FFEBE9; color:#82071E; }
+  /* FIX 2: make benchmark rate inputs clearly editable */
+  .bm-cfg-item .bm-input-wrap { position:relative; }
+  .bm-cfg-item .bm-input-wrap::after { content:'✎'; position:absolute; right:7px; top:50%; transform:translateY(-50%); font-size:10px; color:var(--txt3); pointer-events:none; line-height:1; }
+  .bm-cfg-item input {
+    width:100%; border:1px solid var(--accent); border-radius:4px;
+    padding:5px 22px 5px 6px; font-size:12px; font-family:'JetBrains Mono',monospace;
+    text-align:center; background:#EBF4FF; color:var(--txt);
+    cursor:text;
+  }
+  .bm-cfg-item input:hover { background:#DAEEFF; }
+  .bm-cfg-item input:focus { outline:none; border-color:var(--accent2); background:#D0E8FF; box-shadow:0 0 0 2px rgba(9,105,218,.15); }
+  .bm-cfg-fwd-lbl { font-size:10px; color:var(--accent2); margin-top:3px; text-align:center; font-weight:500; }
+
+  .refresh-btn { font-size:11px; font-family:'Inter',sans-serif; font-weight:500; padding:5px 14px; cursor:pointer; border-radius:var(--radius-sm); border:1px solid var(--border2); background:var(--surface2); color:var(--txt2); transition:border-color .15s,color .15s; }
+  .refresh-btn:hover { border-color:var(--accent); color:var(--accent2); }
+
+  /* ── FIX #4 export button ── */
+  .export-btn { font-size:11px; font-family:'Inter',sans-serif; font-weight:600; padding:6px 16px; cursor:pointer; border-radius:var(--radius-sm); border:1px solid #ABF2BC; background:#DAFBE1; color:#116329; transition:background .15s; }
+  .export-btn:hover { background:#ABF2BC; }
+
+  .legend { display:flex; gap:16px; margin-top:12px; flex-wrap:wrap; }
+  .legend-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--txt2); font-weight:500; }
+  .legend-swatch { width:8px; height:8px; border-radius:2px; display:inline-block; }
+  #absd-preview { margin-top:8px; }
+
+  /* ── Plain-English verdict card ── */
+  .verdict-card {
+    border-radius:var(--radius);
+    padding:20px 22px;
+    margin-bottom:12px;
+    border:1px solid;
+  }
+  .verdict-card.gain { background:#DAFBE1; border-color:#ABF2BC; }
+  .verdict-card.loss { background:#FFEBE9; border-color:#FFBFC9; }
+  .verdict-card.mixed { background:#FFF8C5; border-color:#F2CC60; }
+  .verdict-icon { font-size:22px; margin-bottom:8px; }
+  .verdict-headline {
+    font-size:17px; font-weight:700; line-height:1.3;
+    margin:0 0 10px;
+    font-family:'JetBrains Mono',monospace;
+  }
+  .verdict-headline.pos { color:var(--green); }
+  .verdict-headline.neg { color:var(--red); }
+  .verdict-headline.neu { color:var(--amber); }
+  .verdict-body { font-size:13px; color:#454D57; line-height:1.75; margin:0; }
+  .verdict-body strong { color:#1A1F2E; font-weight:600; }
+  .verdict-pills { display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+  .verdict-pill {
+    font-size:11px; font-weight:600; padding:3px 10px;
+    border-radius:20px; border:1px solid;
+  }
+  .vp-green { background:#DAFBE1; color:#116329; border-color:#ABF2BC; }
+  .vp-red   { background:#FFEBE9; color:#82071E; border-color:#FFBFC9; }
+  .vp-amber { background:#FFF8C5; color:#7A4F00; border-color:#F2CC60; }
+  .vp-blue  { background:#DDF4FF; color:#0550AE; border-color:#B6E3FF; }
+  ::-webkit-scrollbar { width:6px; }
+  ::-webkit-scrollbar-track { background:#E8ECF0; }
+  ::-webkit-scrollbar-thumb { background:#C8CDD5; border-radius:3px; }
+  ::-webkit-scrollbar-thumb:hover { background:#A8ADB5; }
+
+  /* ── FIX 3: Print styles for PDF export — full dark-to-light reset ── */
+  @media print {
+    /* Hide everything except results content */
+    #header, .tab-nav-btns, #results-nav-btns, .hero, .tab1-illus, #print-hero-hide, #print-tab1-hide,
+    .tab-panel:not(#tab-3), .bm-cfg-grid,
+    #print-hide, .results-prompt,
+    .absd-alert, .tip-icon { display:none !important; }
+    #tab-3 { display:block !important; }
+
+    /* Page setup */
+    @page { margin:14mm 12mm; }
+    * { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+
+    /* Base resets */
+    body { background:#fff !important; color:#111 !important; font-size:11px; }
+    .container { padding:0 !important; max-width:100% !important; }
+
+    /* Cards */
+    .card { border:1px solid #ccc !important; background:#fff !important; break-inside:avoid; margin-bottom:8px !important; padding:12px 14px !important; }
+    .card-title { color:#555 !important; }
+    .card-title::before { background:#1F6FEB !important; }
+
+    /* Metric cards */
+    .m { background:#f4f6f8 !important; border:1px solid #ddd !important; }
+    .ml { color:#666 !important; }
+    .mv { font-size:15px !important; }
+    .ms { color:#888 !important; }
+
+    /* Colours */
+    .pos { color:#1a7a40 !important; }
+    .neg { color:#c0392b !important; }
+    .neu { color:#333 !important; }
+
+    /* Row breakdown text */
+    .r .n { color:#555 !important; }
+    .r .v { color:#111 !important; }
+    .r.sub .n, .r.sub .v { color:#777 !important; }
+    .r.tot .n, .r.tot .v { color:#111 !important; }
+    .sub-hdr { color:#777 !important; }
+    .note { color:#888 !important; }
+    .dv { border-top-color:#ddd !important; }
+
+    /* Verdict card */
+    .verdict-card { border:1px solid #ccc !important; background:#f9f9f9 !important; }
+    .verdict-headline.pos { color:#1a7a40 !important; }
+    .verdict-headline.neg { color:#c0392b !important; }
+    .verdict-headline.neu { color:#7a5000 !important; }
+    .verdict-body { color:#333 !important; }
+    .verdict-body strong { color:#111 !important; }
+    .verdict-pill { border:1px solid #ccc !important; background:#eee !important; color:#333 !important; }
+
+    /* Badges — reset dark transparency to solid light fills */
+    .badge { border-width:1px !important; }
+    .bi { background:#ddeeff !important; color:#1a4a8a !important; border-color:#aaccee !important; }
+    .bw { background:#fff3d0 !important; color:#7a5000 !important; border-color:#ddcc88 !important; }
+    .bd { background:#ffe0dd !important; color:#8a1a1a !important; border-color:#eebb99 !important; }
+    .bs { background:#dff0d8 !important; color:#1a5a1a !important; border-color:#aaddaa !important; }
+
+    /* Stamp duty grid */
+    .sdg span { color:#444 !important; }
+    .sdg-hdr { color:#888 !important; }
+
+    /* Benchmark table — replace coloured bars with printed text rows */
+    .bm-hdr { border-bottom:1px solid #ccc !important; }
+    .bm-hdr span { color:#666 !important; }
+    .bm-viz-row { border-bottom:1px solid #eee !important; }
+    .bm-bar-track { display:none !important; }
+    .bm-viz-row > div:first-child div:first-child { color:#111 !important; }
+    .bm-viz-row > div:first-child div:last-child { color:#888 !important; }
+    .legend { display:none !important; }
+
+    /* Results grid stays 2-col */
+    .results-grid { grid-template-columns:1fr 1fr !important; }
+
+    /* Print title */
+    #tab-3::before {
+      content:'SG Property P&L — Results';
+      display:block; font-size:16px; font-weight:600;
+      color:#111; margin-bottom:12px;
+      padding-bottom:8px; border-bottom:2px solid #1F6FEB;
+    }
+  }
+
+  /* ── Hero banner ── */
+  .hero {
+    background: linear-gradient(135deg, #EBF4FF 0%, #F6F8FA 60%, #F0FAF4 100%);
+    border-bottom: 1px solid var(--border2);
+    padding: 32px 24px 28px;
+    text-align: center;
+  }
+  .hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--accent);
+    background: #DDF4FF; border: 1px solid #B6E3FF;
+    padding: 3px 10px; border-radius: 20px; margin-bottom: 14px;
+  }
+  .hero-title {
+    font-size: clamp(20px, 4vw, 28px);
+    font-weight: 700; color: var(--txt);
+    margin: 0 0 8px; line-height: 1.25;
+  }
+  .hero-sub {
+    font-size: 14px; color: var(--txt2);
+    margin: 0 0 28px; line-height: 1.6;
+    max-width: 480px; margin-left: auto; margin-right: auto;
+  }
+  /* Three step cards */
+  .hero-steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    max-width: 700px;
+    margin: 0 auto;
+  }
+  .hero-step {
+    background: #FFFFFF;
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 16px 14px;
+    text-align: center;
+    position: relative;
+  }
+  .hero-step-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 10px;
+  }
+  .hero-step-num {
+    position: absolute; top: -8px; left: -8px;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--accent); color: #fff;
+    font-size: 10px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px solid #fff;
+  }
+  .hero-step-title {
+    font-size: 13px; font-weight: 600; color: var(--txt);
+    margin: 0 0 4px;
+  }
+  .hero-step-desc {
+    font-size: 12px; color: var(--txt2); line-height: 1.5; margin: 0;
+  }
+  /* Arrow connectors between steps (desktop only) */
+  .hero-step-arrow {
+    display: none;
+  }
+  /* Mobile: stack steps vertically */
+  @media (max-width: 580px) {
+    .hero { padding: 22px 16px 20px; }
+    .hero-steps { grid-template-columns: 1fr; gap: 8px; max-width: 340px; }
+    .hero-step { display: flex; align-items: center; gap: 14px; text-align: left; padding: 12px 14px; }
+    .hero-step-icon { width: 38px; height: 38px; flex-shrink: 0; margin: 0; border-radius: 10px; }
+    .hero-step-num { top: -6px; left: -6px; }
+    .hero-sub { font-size: 13px; margin-bottom: 20px; }
+  }
+  /* ── Tab 1 illustration ── */
+  .tab1-illus {
+    text-align: center;
+    padding: 8px 0 4px;
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <div id="ticker">
+    <div class="t-brand">SG Property P&L</div>
+    <div class="t-metrics">
+      <div class="t-metric"><span class="t-lbl">Gross PNL</span><span class="t-val neu" id="tk-gross">—</span></div>
+      <div class="t-metric"><span class="t-lbl">Net PNL</span><span class="t-val neu" id="tk-net">—</span></div>
+      <div class="t-metric"><span class="t-lbl">Ann. Return (equity)</span><span class="t-val neu" id="tk-ann">—</span></div>
+      <div class="t-metric">
+        <span class="t-lbl">
+          <span class="tip-wrap">IRR
+            <span class="tip-icon">?</span>
+            <span class="tip-popup">Internal Rate of Return — accounts for the timing of ALL cash flows (monthly mortgage payments, maintenance, sale proceeds). More accurate than return-on-outlay for leveraged purchases.</span>
+          </span>
+        </span>
+        <span class="t-val neu" id="tk-irr">—</span>
+      </div>
+    </div>
+  </div>
+  <div id="tab-nav">
+    <button class="tab-btn active" onclick="switchTab(0)"><span class="tab-num">1</span>Buyer Profile</button>
+    <button class="tab-btn" onclick="switchTab(1)"><span class="tab-num">2</span>Transaction</button>
+    <button class="tab-btn" onclick="switchTab(2)"><span class="tab-num">3</span>Mortgage & Costs</button>
+    <button class="tab-btn" onclick="switchTab(3)"><span class="tab-num">4</span>Results</button>
+  </div>
+  <!-- Step progress bar -->
+  <div id="step-bar" style="display:flex;align-items:center;padding:0 20px 8px;gap:4px;">
+    <div class="step-seg active" id="seg0"></div>
+    <div class="step-seg" id="seg1"></div>
+    <div class="step-seg" id="seg2"></div>
+    <div class="step-seg" id="seg3"></div>
+    <span id="step-lbl" style="font-size:10px;color:var(--txt3);margin-left:8px;white-space:nowrap;">Step 1 of 4</span>
+  </div>
+</div>
+
+<!-- Hero banner with 3-step instructions -->
+<div class="hero" id="print-hero-hide">
+  <div class="hero-eyebrow">
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1L7.5 4.5L11 5.5L8.5 8L9 11.5L6 10L3 11.5L3.5 8L1 5.5L4.5 4.5L6 1Z" fill="#0969DA"/></svg>
+    Free · No sign-up needed
+  </div>
+  <h1 class="hero-title">Is this property deal worth it?</h1>
+  <p class="hero-sub">Enter your deal details across 3 quick steps and see your true profit — after stamp duties, mortgage interest, and all costs.</p>
+
+  <div class="hero-steps">
+
+    <div class="hero-step">
+      <div class="hero-step-num">1</div>
+      <div class="hero-step-icon" style="background:#EBF4FF;">
+        <!-- Person / profile icon -->
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0969DA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+        </svg>
+      </div>
+      <div>
+        <div class="hero-step-title">Tell us who you are</div>
+        <p class="hero-step-desc">Citizenship &amp; property count sets your stamp duty rate.</p>
+      </div>
+    </div>
+
+    <div class="hero-step">
+      <div class="hero-step-num">2</div>
+      <div class="hero-step-icon" style="background:#F0FAF4;">
+        <!-- Home / price tag icon -->
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1A7F37" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/>
+        </svg>
+      </div>
+      <div>
+        <div class="hero-step-title">Enter your property deal</div>
+        <p class="hero-step-desc">Buy price, sale price, and when you plan to sell.</p>
+      </div>
+    </div>
+
+    <div class="hero-step">
+      <div class="hero-step-num">3</div>
+      <div class="hero-step-icon" style="background:#FFF8C5;">
+        <!-- Chart / results icon -->
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9A6700" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 20h18M7 20V12M12 20V8M17 20V4"/>
+          <circle cx="17" cy="4" r="1.5" fill="#9A6700" stroke="none"/>
+        </svg>
+      </div>
+      <div>
+        <div class="hero-step-title">See your real profit</div>
+        <p class="hero-step-desc">Your net gain, IRR, and how it stacks up vs stocks &amp; CPF.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- TAB 1: Buyer Profile -->
+  <div class="tab-panel active" id="tab-0">
+    <!-- Tab 1 illustration -->
+    <div class="tab1-illus" id="print-tab1-hide">
+      <svg width="120" height="80" viewBox="0 0 120 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Sky background -->
+        <rect width="120" height="80" rx="10" fill="#EBF4FF"/>
+        <!-- Sun -->
+        <circle cx="96" cy="18" r="10" fill="#FFF8C5" stroke="#F2CC60" stroke-width="1.5"/>
+        <line x1="96" y1="4" x2="96" y2="1" stroke="#F2CC60" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="96" y1="35" x2="96" y2="32" stroke="#F2CC60" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="82" y1="18" x2="79" y2="18" stroke="#F2CC60" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="113" y1="18" x2="110" y2="18" stroke="#F2CC60" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="86.3" y1="7.3" x2="84.2" y2="5.2" stroke="#F2CC60" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="107.8" y1="28.8" x2="105.7" y2="26.7" stroke="#F2CC60" stroke-width="1.5" stroke-linecap="round"/>
+        <!-- Ground -->
+        <rect x="0" y="62" width="120" height="18" rx="0" fill="#DAFBE1"/>
+        <rect x="0" y="70" width="120" height="10" rx="0" fill="#ABF2BC"/>
+        <!-- House body -->
+        <rect x="28" y="42" width="46" height="28" rx="2" fill="white" stroke="#B6D9F7" stroke-width="1.5"/>
+        <!-- Roof -->
+        <polygon points="24,44 60,20 96,44" fill="#0969DA" opacity="0.85"/>
+        <polygon points="24,44 60,20 96,44" fill="none" stroke="#0550AE" stroke-width="1.5" stroke-linejoin="round"/>
+        <!-- Chimney -->
+        <rect x="72" y="24" width="7" height="12" rx="1" fill="#CF222E" opacity="0.7"/>
+        <!-- Door -->
+        <rect x="50" y="54" width="12" height="16" rx="2" fill="#DDF4FF" stroke="#B6D9F7" stroke-width="1"/>
+        <circle cx="59" cy="62" r="1.2" fill="#0969DA"/>
+        <!-- Window left -->
+        <rect x="32" y="50" width="12" height="10" rx="1.5" fill="#DDF4FF" stroke="#B6D9F7" stroke-width="1"/>
+        <line x1="38" y1="50" x2="38" y2="60" stroke="#B6D9F7" stroke-width="0.8"/>
+        <line x1="32" y1="55" x2="44" y2="55" stroke="#B6D9F7" stroke-width="0.8"/>
+        <!-- Window right -->
+        <rect x="58" y="50" width="12" height="10" rx="1.5" fill="#DDF4FF" stroke="#B6D9F7" stroke-width="1"/>
+        <line x1="64" y1="50" x2="64" y2="60" stroke="#B6D9F7" stroke-width="0.8"/>
+        <line x1="58" y1="55" x2="70" y2="55" stroke="#B6D9F7" stroke-width="0.8"/>
+        <!-- Path -->
+        <rect x="53" y="70" width="6" height="10" fill="#C8CDD5" rx="1"/>
+        <!-- Tree left -->
+        <rect x="10" y="54" width="3" height="10" rx="1" fill="#ABF2BC"/>
+        <ellipse cx="11.5" cy="50" rx="7" ry="9" fill="#1A7F37" opacity="0.7"/>
+        <!-- Tree right -->
+        <rect x="107" y="56" width="3" height="8" rx="1" fill="#ABF2BC"/>
+        <ellipse cx="108.5" cy="52" rx="6" ry="8" fill="#1A7F37" opacity="0.6"/>
+        <!-- S$ tag -->
+        <rect x="76" y="28" width="36" height="18" rx="9" fill="#0969DA"/>
+        <text x="94" y="41" font-family="'JetBrains Mono', monospace" font-size="10" font-weight="700" fill="white" text-anchor="middle">S$ ?</text>
+      </svg>
+      <p style="font-size:12px;color:var(--txt3);margin:8px 0 16px;font-style:italic;">Fill in your details below to find out your true profit</p>
+    </div>
+
+    <div class="card">
+      <p class="card-title">Citizenship & residency status</p>
+      <div class="g2">
+        <div class="f"><label>Citizenship / entity</label>
+          <select id="ctz">
+            <option value="sc">Singapore citizen (SC)</option>
+            <option value="spr">Singapore PR (SPR)</option>
+            <option value="foreigner">Foreigner</option>
+            <option value="entity">Company / entity / trust</option>
+          </select>
+        </div>
+        <div class="f"><label>Property count (after this purchase)</label>
+          <select id="pc">
+            <option value="1">1st residential property</option>
+            <option value="2">2nd residential property</option>
+            <option value="3">3rd or subsequent</option>
+          </select>
+        </div>
+      </div>
+      <div class="f">
+        <label>Property use</label>
+        <div class="pill" style="margin-top:2px">
+          <button id="btn-own" class="active" onclick="setUse('own')">Own stay</button>
+          <button id="btn-rent" onclick="setUse('rent')">Rental</button>
+        </div>
+      </div>
+      <div id="absd-preview"></div>
+      <!-- FIX #6: ABSD high-rate alert -->
+      <div class="absd-alert" id="absd-alert">
+        <strong>High ABSD rate.</strong> At this rate, stamp duty alone is a very significant portion of your purchase price. Make sure this cost is factored into your financial planning before proceeding.
+      </div>
+    </div>
+
+    <div class="tab-nav-btns">
+      <span></span>
+      <button class="nav-btn primary" onclick="switchTab(1)">Transaction details →</button>
+    </div>
+  </div>
+
+  <!-- TAB 2: Transaction -->
+  <div class="tab-panel" id="tab-1">
+    <div class="card">
+      <p class="card-title">Dates & prices</p>
+      <div class="g2">
+        <div class="f"><label>Purchase date</label><input type="date" id="pd" value="2025-07-10"></div>
+        <div class="f"><label>Sale date</label><input type="date" id="sd" value="2028-07-10"></div>
+      </div>
+      <div class="g2">
+        <div class="f"><label>Purchase price (S$)</label><input type="number" id="pp" value="1500000" min="0" step="10000"></div>
+        <div class="f"><label>Sale price (S$)</label><input type="number" id="sp" value="1800000" min="0" step="10000"></div>
+      </div>
+      <div id="regime-info" style="margin-top:6px"></div>
+    </div>
+
+    <div class="g2">
+      <div class="card" style="margin-bottom:0">
+        <p class="card-title">
+          <!-- FIX #2: BSD tooltip -->
+          <span class="tip-wrap">Purchase costs
+            <span class="tip-icon">?</span>
+            <span class="tip-popup"><strong>BSD</strong> (Buyer's Stamp Duty) is calculated on the purchase price using tiered rates (1–6%). Legal and valuation fees are typical third-party costs.</span>
+          </span>
+        </p>
+        <div class="f"><label>Legal / conveyancing (S$)</label><input type="number" id="lbuy" value="3000" min="0" step="500"></div>
+        <div class="f"><label>Valuation fee (S$)</label><input type="number" id="val" value="400" min="0" step="100"></div>
+        <div class="f"><label>Mortgage stamp duty (S$)</label><input type="number" id="mstamp" value="500" min="0" step="50"></div>
+      </div>
+      <div class="card" style="margin-bottom:0">
+        <p class="card-title">
+          <span class="tip-wrap">Sale costs
+            <span class="tip-icon">?</span>
+            <span class="tip-popup"><strong>SSD</strong> (Seller's Stamp Duty) applies if you sell within 4 years of purchase (for properties bought from Jul 2025). Agent commission is typically 1–2% of sale price.</span>
+          </span>
+        </p>
+        <div class="f"><label>Agent commission (%)</label><input type="number" id="arate" value="2" min="0" step="0.1"></div>
+        <div class="f"><label>Legal / conveyancing (S$)</label><input type="number" id="lsell" value="2500" min="0" step="500"></div>
+        <div class="f"><label>Misc / admin (S$)</label><input type="number" id="misc" value="300" min="0" step="100"></div>
+      </div>
+    </div>
+
+    <div class="tab-nav-btns">
+      <button class="nav-btn" onclick="switchTab(0)">← Buyer profile</button>
+      <button class="nav-btn primary" onclick="switchTab(2)">Mortgage & costs →</button>
+    </div>
+  </div>
+
+  <!-- TAB 3: Mortgage & Costs -->
+  <div class="tab-panel" id="tab-2">
+    <div class="card">
+      <p class="card-title">Financing</p>
+      <div class="g3">
+        <div class="f">
+          <!-- FIX #2 + FIX #3: LTV label with tooltip and validation -->
+          <label>
+            <span class="tip-wrap">Loan-to-value (%)
+              <span class="tip-icon">?</span>
+              <span class="tip-popup"><strong>LTV</strong> — Loan-to-Value ratio. The percentage of the purchase price financed by a bank loan. MAS caps residential property loans at 75% for most buyers. A lower LTV means more cash upfront.</span>
+            </span>
+          </label>
+          <input type="number" id="ltv" value="75" min="0" max="75" step="5">
+          <div class="field-err" id="ltv-err">MAS maximum LTV for residential property is 75%. The calculator will use 75%.</div>
+        </div>
+        <div class="f"><label>Mortgage rate (% p.a.)</label><input type="number" id="mrate" value="3.5" min="0" step="0.1"></div>
+        <div class="f"><label>Loan term</label>
+          <select id="lterm">
+            <option value="5">5 years</option><option value="10">10 years</option>
+            <option value="15">15 years</option><option value="20">20 years</option>
+            <option value="25">25 years</option><option value="30" selected>30 years</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="card-title">Holding costs</p>
+      <div class="g3">
+        <div class="f"><label>Monthly maintenance & misc (S$)</label><input type="number" id="mcost" value="600" min="0" step="100"></div>
+        <div class="f"><label>Annual property tax (S$)</label><input type="number" id="ptax" value="4200" min="0" step="100"></div>
+        <div id="rental-field" style="display:none" class="f"><label>Monthly rental income (S$)</label><input type="number" id="rent" value="4500" min="0" step="100"></div>
+      </div>
+      <p class="note">Property tax: owner-occupied 0–16% on annual value; non-owner-occupied / rental 12–36%.</p>
+    </div>
+
+    <!-- FIX #1: Results prompt banner -->
+    <div class="results-prompt" id="results-prompt">
+      <div class="results-prompt-text">
+        ✓ All inputs ready — <span>your P&L results are on Tab 4.</span>
+      </div>
+      <button class="nav-btn primary" onclick="switchTab(3)" style="white-space:nowrap;flex-shrink:0">View results →</button>
+    </div>
+
+    <div class="tab-nav-btns">
+      <button class="nav-btn" onclick="switchTab(1)">← Transaction</button>
+      <button class="nav-btn primary" onclick="switchTab(3)">View results →</button>
+    </div>
+  </div>
+
+  <!-- TAB 4: Results -->
+  <div class="tab-panel" id="tab-3">
+
+    <!-- 1. Plain-English verdict -->
+    <div id="plain-summary"></div>
+
+    <!-- 2. P&L summary metrics -->
+    <div id="pnl-summary"></div>
+
+    <!-- 3. Benchmark comparison -->
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <p class="card-title" style="margin:0">Benchmark comparison</p>
+        <div style="display:flex;gap:8px">
+          <button class="export-btn" id="print-hide" onclick="window.print()">↓ Export PDF</button>
+          <button class="refresh-btn" onclick="alert('Paste updated rates into the 2026+ fields below.\nSources: IRAS, MAS, SSGA, SlickCharts, REITAS.')">Update rates</button>
+        </div>
+      </div>
+      <!-- Layman explanation of benchmark comparison -->
+      <div style="background:#F0F6FF;border:1px solid #B6D9F7;border-radius:8px;padding:11px 14px;margin-bottom:14px;display:flex;align-items:flex-start;gap:10px;">
+        <span style="font-size:16px;flex-shrink:0;margin-top:1px;">💡</span>
+        <div>
+          <span style="font-size:13px;color:#1A1F2E;line-height:1.6;"><strong>Could your money work harder elsewhere?</strong> This table shows what you'd have earned if you'd put the same upfront cash into stocks, CPF, or bonds instead — over the same period. If property tops the list, buying makes sense. If it doesn't, it's worth thinking twice.</span>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;">
+            <span style="font-size:11px;font-weight:600;padding:1px 8px;border-radius:20px;background:#DAFBE1;color:#116329;border:1px solid #ABF2BC;">Green = beats property</span>
+            <span style="font-size:11px;font-weight:600;padding:1px 8px;border-radius:20px;background:#F0F2F5;color:#57606A;border:1px solid #D0D7DE;">Grey = underperforms</span>
+            <span style="font-size:11px;font-weight:600;padding:1px 8px;border-radius:20px;background:#DDF4FF;color:#0550AE;border:1px solid #B6E3FF;">Blue chips = actual history</span>
+          </div>
+        </div>
+      </div>
+      <div class="bm-cfg-grid" id="bm-cfg"></div>
+      <p class="note" style="margin-bottom:14px;color:#6E7781">Data as of Jun 2026 · STI ETF: 2024 +22.1%, 2025 +28.1% · S&P 500: 2024 +25.0%, 2025 +17.9% · S-REITs: 2024 −6.7%, 2025 +24.2% · SSB 10-yr: 2.14% · T-bill 6m: 1.48%</p>
+      <div class="bm-hdr">
+        <span>Asset</span><span>Profit vs initial outlay</span>
+        <span>Profit (S$)</span><span>Ann. return</span><span>vs Property</span>
+      </div>
+      <div id="bm-rows"></div>
+    </div>
+
+    <div class="tab-nav-btns" id="results-nav-btns">
+      <button class="nav-btn" onclick="switchTab(2)">← Mortgage & costs</button>
+      <span></span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ─── Tab switching ─── */
+let currentTab = 0;
+const tabBtns = document.querySelectorAll('.tab-btn');
+const tabPanels = document.querySelectorAll('.tab-panel');
+
+function switchTab(idx) {
+  currentTab = idx;
+  tabBtns.forEach((b, i) => b.className = 'tab-btn' + (i === idx ? ' active' : ''));
+  tabPanels.forEach((p, i) => p.className = 'tab-panel' + (i === idx ? ' active' : ''));
+  if (idx === 3) render();
+  /* Update step progress bar */
+  for (let i = 0; i < 4; i++) {
+    const seg = document.getElementById('seg' + i);
+    if (!seg) continue;
+    if (i < idx)       seg.className = 'step-seg done';
+    else if (i === idx) seg.className = 'step-seg active';
+    else                seg.className = 'step-seg';
+  }
+  const lbl = document.getElementById('step-lbl');
+  if (lbl) lbl.textContent = idx < 3 ? `Step ${idx+1} of 4` : 'Results';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ─── Helpers ─── */
+let useMode = 'own';
+function setUse(m) {
+  useMode = m;
+  document.getElementById('btn-own').className = m === 'own' ? 'active' : '';
+  document.getElementById('btn-rent').className = m === 'rent' ? 'active' : '';
+  document.getElementById('rental-field').style.display = m === 'rent' ? 'block' : 'none';
+  render();
+}
+function fmt(n) { const a = Math.abs(Math.round(n)); return (n < 0 ? '-S$' : 'S$') + a.toLocaleString('en-SG'); }
+function fA(n) { return 'S$' + Math.round(Math.abs(n)).toLocaleString('en-SG'); }
+function pct(n, d) { return d === 0 ? '—' : (n / d * 100).toFixed(1) + '%'; }
+
+function monthsBetween(d1, d2) {
+  const a = new Date(d1), b = new Date(d2);
+  return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth()) + (b.getDate() >= a.getDate() ? 0 : -1);
+}
+
+/* ─── SSD ─── */
+function ssdRegime(pd) {
+  const d = new Date(pd);
+  return d >= new Date('2025-07-04') ? 'new' : d >= new Date('2017-03-11') ? 'old' : 'pre2017';
+}
+function calcSSD(sp, pd, sd) {
+  const reg = ssdRegime(pd);
+  if (reg === 'pre2017') return { tax:0, label:null, reg };
+  const mo = monthsBetween(pd, sd);
+  if (reg === 'old') {
+    if (mo > 36) return { tax:0, label:null, reg };
+    const r = mo <= 12 ? .12 : mo <= 24 ? .08 : .04;
+    return { tax:sp*r, label:`${(r*100).toFixed(0)}% (old: ${mo<=12?'≤1yr':mo<=24?'1–2yr':'2–3yr'})`, reg };
+  }
+  if (mo > 48) return { tax:0, label:null, reg };
+  const r = mo <= 12 ? .16 : mo <= 24 ? .12 : mo <= 36 ? .08 : .04;
+  return { tax:sp*r, label:`${(r*100).toFixed(0)}% (new: ${mo<=12?'≤1yr':mo<=24?'1–2yr':mo<=36?'2–3yr':'3–4yr'})`, reg };
+}
+
+/* ─── BSD ─── */
+function calcBSD(p) {
+  const bands = [{f:0,t:180000,r:.01},{f:180000,t:360000,r:.02},{f:360000,t:1000000,r:.03},{f:1000000,t:1500000,r:.04},{f:1500000,t:3000000,r:.05},{f:3000000,t:Infinity,r:.06}];
+  let tax = 0; const bd = [];
+  for (const b of bands) {
+    if (p <= b.f) break;
+    const tx = Math.min(p,b.t)-b.f, amt = tx*b.r;
+    bd.push({ label:`On next ${fA(tx)}`, rate:(b.r*100).toFixed(0)+'%', amt });
+    tax += amt;
+  }
+  return { tax, bd };
+}
+
+/* ─── ABSD ─── */
+const ABSD = { sc:{1:0,2:.20,3:.30}, spr:{1:.05,2:.30,3:.35}, foreigner:{1:.60,2:.60,3:.60}, entity:{1:.65,2:.65,3:.65} };
+const ABSD_LBL = { sc:'Singapore citizen', spr:'Singapore PR', foreigner:'Foreigner', entity:'Company / entity / trust' };
+
+/* ─── Mortgage ─── */
+function calcMort(pp, ltv, annRate, holdMo, termYrs) {
+  const loan = pp*(ltv/100), r = annRate/100/12, n = termYrs*12;
+  if (loan === 0) return { loan:0, mp:0, ti:0, tp:0, bal:0 };
+  if (r === 0) { const mp = loan/n, tp = mp*Math.min(holdMo,n); return { loan, mp, ti:0, tp, bal:loan-tp }; }
+  const mp = loan*(r*Math.pow(1+r,n))/(Math.pow(1+r,n)-1);
+  let bal = loan, ti = 0, tp = 0;
+  for (let i = 0; i < Math.min(holdMo,n); i++) {
+    const int = bal*r, pr = Math.min(mp-int,bal);
+    ti += int; tp += pr; bal -= pr;
+  }
+  return { loan, mp, ti, tp, bal };
+}
+
+function annRet(profit, outlay, mo) {
+  if (outlay <= 0 || mo <= 0 || profit <= -outlay) return null;
+  return (Math.pow(1+profit/outlay, 12/mo)-1)*100;
+}
+
+/* True IRR — accounts for monthly mortgage + holding cash flows */
+function calcIRR(initialOutlay, mp, mcostMo, ptaxMo, netSaleProceeds, holdMo) {
+  if (initialOutlay <= 0 || holdMo <= 0) return null;
+  const monthlyOut = mp + mcostMo + ptaxMo;
+  const cfs = [-initialOutlay];
+  for (let i = 1; i < holdMo; i++) cfs.push(-monthlyOut);
+  cfs.push(-monthlyOut + netSaleProceeds);
+  /* Newton-Raphson */
+  let rate = 0.005;
+  for (let iter = 0; iter < 300; iter++) {
+    let npv = 0, dnpv = 0;
+    for (let t = 0; t < cfs.length; t++) {
+      const d = Math.pow(1+rate, t);
+      npv  += cfs[t] / d;
+      dnpv -= t * cfs[t] / ((1+rate) * d);
+    }
+    if (Math.abs(dnpv) < 1e-12) break;
+    const delta = npv / dnpv;
+    rate -= delta;
+    if (Math.abs(delta) < 1e-10) break;
+  }
+  if (!isFinite(rate) || rate <= -1) return null;
+  return (Math.pow(1 + rate, 12) - 1) * 100;
+}
+
+/* ─── Benchmark data ─── */
+const ACTUALS = {
+  sti:    { 2023:null, 2024:22.1, 2025:28.1 },
+  sp500:  { 2023:26.3, 2024:25.0, 2025:17.9 },
+  sreits: { 2023:null, 2024:-6.7, 2025:24.2 },
+  cpfoa:{}, cpfsa:{}, ssb:{}, tbill:{},
+};
+const BMS = [
+  { id:'sti',    name:'STI ETF (ES3)',     src:'SSGA · Morningstar', fwd0:10.1 },
+  { id:'sp500',  name:'S&P 500 (USD)',      src:'SlickCharts',         fwd0:10.0 },
+  { id:'sreits', name:'S-REITs (FTSE ST)',  src:'REITAS',              fwd0:7.0  },
+  { id:'cpfoa',  name:'CPF Ordinary Acct', src:'CPF Board (fixed)',   fwd0:2.5  },
+  { id:'cpfsa',  name:'CPF Special / Ret', src:'CPF Board (fixed)',   fwd0:4.0  },
+  { id:'ssb',    name:'SSB (10-yr avg)',    src:'MAS Jun 2026',        fwd0:2.14 },
+  { id:'tbill',  name:'T-bills (6-month)', src:'MAS Jun 2026',        fwd0:1.48 },
+];
+
+function buildBmCfg() {
+  const cfg = document.getElementById('bm-cfg');
+  cfg.innerHTML = '';
+  /* FIX 2: Add editable header row above grid — only insert once */
+  const existingHdr = document.getElementById('bm-edit-hdr');
+  if (!existingHdr) {
+    const hdr = document.createElement('p');
+    hdr.id = 'bm-edit-hdr';
+    hdr.style.cssText = 'font-size:11px;color:var(--accent);font-weight:500;margin:0 0 8px;display:flex;align-items:center;gap:5px;';
+    hdr.innerHTML = '<span style="font-size:13px">✎</span> Click any rate below to edit your forward return assumption';
+    cfg.before(hdr);
+  }
+  for (const bm of BMS) {
+    const act = ACTUALS[bm.id] || {};
+    const chips = Object.entries(act).filter(([,v]) => v!==null).map(([yr,v]) => `<span class="act-chip ${v>=0?'act-pos':'act-neg'}">${yr}: ${v>=0?'+':''}${v}%</span>`).join('');
+    const div = document.createElement('div');
+    div.className = 'bm-cfg-item';
+    div.innerHTML = `
+      <div class="bm-cfg-name">${bm.name}</div>
+      <div class="bm-cfg-actuals">${chips||'<span style="font-size:10px;color:var(--txt3)">fixed rate</span>'}</div>
+      <div class="bm-input-wrap">
+        <input type="number" id="fwd-${bm.id}" value="${bm.fwd0}" step="0.1" title="Click to edit 2026+ expected annual return (%)">
+      </div>
+      <div class="bm-cfg-fwd-lbl">✎ 2026+ est. % p.a.</div>`;
+    cfg.appendChild(div);
+    div.querySelector('input').addEventListener('input', render);
+  }
+}
+
+function bmProfit(outlay, purchaseDate, saleDate, id) {
+  if (!purchaseDate || !saleDate || outlay <= 0) return 0;
+  const fwd = parseFloat(document.getElementById('fwd-'+id)?.value ?? BMS.find(b=>b.id===id)?.fwd0 ?? 0);
+  const actYr = yr => { const a = ACTUALS[id]||{}; return (a[yr]!==null&&a[yr]!==undefined)?a[yr]/100:fwd/100; };
+  let v = outlay, cur = new Date(purchaseDate), end = new Date(saleDate);
+  while (cur < end) {
+    const yr = cur.getFullYear(), ny = new Date(yr+1,0,1);
+    const segEnd = ny<end?ny:end;
+    const yrDays = (ny-new Date(yr,0,1))/864e5, segDays = (segEnd-cur)/864e5;
+    v *= Math.pow(1+actYr(yr), segDays/yrDays);
+    cur = segEnd;
+  }
+  return v-outlay;
+}
+
+function renderBmRows(rows, propProfit) {
+  const maxP = Math.max(...rows.map(r=>r.profit),1), minP = Math.min(...rows.map(r=>r.profit),0);
+  const span = Math.max(Math.abs(maxP),Math.abs(minP),1);
+  const zeroFrac = minP<0?Math.abs(minP)/span*100:0;
+  const container = document.getElementById('bm-rows');
+  container.innerHTML = '';
+  for (const row of rows) {
+    const isProp = row.id==='property';
+    const beatsProp = !isProp && row.profit>propProfit;
+    const barColor = isProp?(row.profit>=0?'#1A7F37':'#CF222E'):beatsProp?'#0969DA':'#C8CDD5';
+    const barW = Math.abs(row.profit)/span*(100-zeroFrac-2);
+    const barLeft = row.profit>=0?zeroFrac:zeroFrac-barW;
+    const vsDiff = row.profit-propProfit;
+    const vsStr = isProp?'—':(vsDiff>=0?'+':'')+fmt(vsDiff);
+    const vsColor = isProp?'var(--txt3)':vsDiff>=0?'var(--green)':'var(--red)';
+    const annStr = row.ann!==null?(row.ann>=0?'+':'')+row.ann.toFixed(1)+'%':'—';
+    const profColor = row.profit>=0?'var(--green)':'var(--red)';
+    const zeroLine = minP<0?`<div style="position:absolute;left:${zeroFrac}%;top:0;bottom:0;width:1px;background:rgba(0,0,0,.2);z-index:1"></div>`:'';
+    const div = document.createElement('div');
+    div.className = 'bm-viz-row'+(isProp?' prop-row':'');
+    div.innerHTML = `<div><div style="font-size:12px;font-weight:${isProp?'600':'400'};color:${isProp?'var(--txt)':'var(--txt2)'};line-height:1.3">${row.name}</div><div style="font-size:10px;color:var(--txt3)">${row.src}</div></div><div class="bm-bar-track">${zeroLine}<div class="bm-bar-fill" style="left:${barLeft}%;width:${Math.max(barW,0.5)}%;background:${barColor}"></div></div><div style="text-align:right;font-size:12px;font-weight:600;color:${profColor};font-family:'JetBrains Mono',monospace">${fmt(row.profit)}</div><div style="text-align:right;font-size:11px;color:${profColor};font-family:'JetBrains Mono',monospace">${annStr}</div><div style="text-align:right;font-size:11px;color:${vsColor};font-weight:${!isProp&&vsDiff>0?600:400};font-family:'JetBrains Mono',monospace">${vsStr}</div>`;
+    container.appendChild(div);
+  }
+  const leg = document.createElement('div');
+  leg.className = 'legend';
+  leg.innerHTML = `<span class="legend-item"><span class="legend-swatch" style="background:#3FB950"></span>Property</span><span class="legend-item"><span class="legend-swatch" style="background:#1F6FEB"></span>Outperforms property</span><span class="legend-item"><span class="legend-swatch" style="background:#30363D"></span>Underperforms property</span>`;
+  container.appendChild(leg);
+}
+
+let wfChart = null;
+function renderWF(bars) {
+  const canvas = document.getElementById('wf-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (wfChart) wfChart.destroy();
+
+  /* Separate summary bar (Net PNL) from flow bars */
+  const flowBars    = bars.filter(b => !b.isSummary);
+  const summaryBars = bars.filter(b =>  b.isSummary);
+  const allBars     = [...flowBars, ...summaryBars];
+
+  /* For the summary bar: draw it as [0, netPnl] so it spans from baseline */
+  const chartData = allBars.map(b => b.isSummary ? [Math.min(0,b.v), Math.max(0,b.v)] : [b.s, b.s+b.v]);
+  const bgColors  = allBars.map(b => b.c);
+  /* Give summary bar a lighter, distinct alpha to signal it's a total */
+  const finalIdx  = allBars.findIndex(b => b.isSummary);
+  if (finalIdx >= 0) bgColors[finalIdx] = allBars[finalIdx].c + 'CC'; /* 80% alpha hex */
+
+  wfChart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: allBars.map(b => b.l),
+      datasets:[
+        /* Flow bars */
+        { data: chartData, backgroundColor: bgColors, borderRadius:4, borderSkipped:false },
+        /* Connector line at zero for the summary bar */
+        { type:'line', data: allBars.map((_,i) => i === finalIdx ? 0 : null),
+          borderColor:'rgba(0,0,0,0.2)', borderWidth:1, borderDash:[3,3],
+          pointRadius:0, fill:false, tension:0 }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'#FFFFFF', borderColor:'rgba(0,0,0,.15)', borderWidth:1,
+          titleColor:'#57606A', bodyColor:'#1A1F2E',
+          callbacks:{
+            label: c => {
+              if (c.datasetIndex !== 0) return null;
+              const b = allBars[c.dataIndex];
+              return b.isSummary ? fmt(b.v) : fmt(b.v);
+            }
+          }
+        },
+        annotation: undefined
+      },
+      scales:{
+        x:{ ticks:{color:'#6E7781',font:{size:10,family:'Inter'},maxRotation:35}, grid:{display:false}, border:{color:'rgba(0,0,0,.08)'} },
+        y:{ ticks:{color:'#6E7781',font:{size:10,family:'JetBrains Mono'},callback:v=>'S$'+(v/1000).toFixed(0)+'k'}, grid:{color:'rgba(0,0,0,.05)'}, border:{color:'rgba(0,0,0,.08)'} }
+      }
+    }
+  });
+}
+
+/* ─── Plain-English verdict ─── */
+function buildPlainSummary({
+  pp, spv, netPnl, grossPnl, initialOutlay, holdMo,
+  bsd, absd, ssd, mort, totalMaint, totalPtax, totalRent,
+  agentFee, lsell, misc, lbuy, val, mstamp,
+  annStr, irrStr, irr, hpr, useMode, monthlyRent,
+  ctz, pc, ltv, mrate, lterm, absdRate
+}) {
+  const holdYrs = (holdMo / 12).toFixed(1);
+  const isGain  = netPnl > 0;
+  const isFlat  = Math.abs(netPnl) < 5000;
+  const verdict = isFlat ? 'mixed' : isGain ? 'gain' : 'loss';
+  const icon    = isFlat ? '≈' : isGain ? '↑' : '↓';
+  const hCls    = isFlat ? 'neu' : isGain ? 'pos' : 'neg';
+
+  const totalCosts  = bsd + absd + lbuy + val + mstamp + ssd + agentFee + lsell + misc + mort.ti + totalMaint + totalPtax;
+  const biggestCost = (() => {
+    const items = [
+      { n:'mortgage interest', v:mort.ti },
+      { n:'stamp duties (BSD + ABSD + SSD)', v:bsd+absd+ssd },
+      { n:'agent & transaction fees', v:agentFee+lsell+misc+lbuy+val+mstamp },
+      { n:'maintenance & property tax', v:totalMaint+totalPtax },
+    ];
+    return items.sort((a,b)=>b.v-a.v)[0];
+  })();
+
+  const rentNote = useMode === 'rent'
+    ? ` Along the way, rental income of <strong>${fmt(totalRent)}</strong> (${fmt(monthlyRent)}/mo) offsets your holding costs.`
+    : '';
+
+  const ssdNote = ssd > 0
+    ? ` Seller's Stamp Duty of <strong>${fmt(ssd)}</strong> applies because the planned hold is under 4 years — extending to 4+ years would eliminate this cost.`
+    : '';
+
+  const absdNote = absdRate >= 0.20
+    ? ` ABSD of <strong>${fmt(absd)}</strong> (${(absdRate*100).toFixed(0)}%) is your single largest upfront cost — factor this into your cash planning before committing.`
+    : '';
+
+  const headline = isFlat
+    ? `This deal is roughly break-even at ${fmt(netPnl)}`
+    : `${isGain ? 'You stand to make' : 'You stand to lose'} ${fmt(Math.abs(netPnl))} on this deal`;
+
+  /* 2-sentence verdict: net result + biggest cost driver */
+  const body = `After ${holdYrs} years, buying at <strong>${fmt(pp)}</strong> and selling at <strong>${fmt(spv)}</strong> leaves you with a net ${isGain ? 'gain' : 'loss'} of <strong>${fmt(Math.abs(netPnl))}</strong> once stamp duties, mortgage interest, and transaction costs are deducted. Your biggest cost drag is <strong>${biggestCost.n}</strong> (${fmt(biggestCost.v)})${ssdNote ? ' — and SSD applies because your hold is under 4 years' : ''}${absdNote ? '; ABSD of ' + fmt(absd) + ' is your largest upfront hit' : ''}.`;
+
+  const pills = [
+    { label: fmt(netPnl) + ' net', cls: isGain ? 'vp-green' : isFlat ? 'vp-amber' : 'vp-red' },
+    { label: irrStr + ' IRR', cls: (irr !== null && irr >= 0) ? 'vp-green' : 'vp-red' },
+    { label: holdYrs + ' yr hold', cls: 'vp-blue' },
+    { label: fmt(initialOutlay) + ' cash needed', cls: 'vp-blue' },
+    ssd > 0 ? { label: fmt(ssd) + ' SSD applies', cls: 'vp-amber' } : null,
+    absdRate >= 0.20 ? { label: (absdRate*100).toFixed(0) + '% ABSD = ' + fmt(absd), cls: 'vp-amber' } : null,
+    useMode === 'rent' ? { label: fmt(totalRent) + ' rental income', cls: 'vp-green' } : null,
+  ].filter(Boolean);
+
+  return `
+    <div class="verdict-card ${verdict}">
+      <div class="verdict-icon">${icon}</div>
+      <div class="verdict-headline ${hCls}">${headline}</div>
+      <p class="verdict-body">${body}</p>
+      <div class="verdict-pills">${pills.map(p=>`<span class="verdict-pill ${p.cls}">${p.label}</span>`).join('')}</div>
+    </div>`;
+}
+
+/* ─── Main render ─── */
+function render() {
+  const purchaseDate = document.getElementById('pd').value;
+  const saleDate     = document.getElementById('sd').value;
+  const riEl = document.getElementById('regime-info');
+  if (!purchaseDate || !saleDate || new Date(saleDate) <= new Date(purchaseDate)) {
+    if (riEl) riEl.innerHTML = '<span style="font-size:11px;color:var(--red)">Sale date must be after purchase date.</span>';
+    return;
+  }
+  const holdMo  = monthsBetween(purchaseDate, saleDate);
+  const holdYrs = holdMo/12;
+  const ctz     = document.getElementById('ctz').value;
+  const pc      = parseInt(document.getElementById('pc').value)||1;
+  const pp      = parseFloat(document.getElementById('pp').value)||0;
+  const spv     = parseFloat(document.getElementById('sp').value)||0;
+
+  /* FIX #3: LTV validation — cap at 75, show warning */
+  const ltvRaw  = parseFloat(document.getElementById('ltv').value)||0;
+  const ltvErr  = document.getElementById('ltv-err');
+  const ltvInput = document.getElementById('ltv');
+  const ltvExceeds = ltvRaw > 75;
+  if (ltvErr)   ltvErr.className   = 'field-err' + (ltvExceeds ? ' show' : '');
+  if (ltvInput) ltvInput.className = ltvExceeds ? 'input-err' : '';
+  const ltv = ltvExceeds ? 75 : ltvRaw;
+
+  const mrate   = parseFloat(document.getElementById('mrate').value)||0;
+  const lterm   = parseInt(document.getElementById('lterm').value)||30;
+  const mcost   = parseFloat(document.getElementById('mcost').value)||0;
+  const ptax    = parseFloat(document.getElementById('ptax').value)||0;
+  const monthlyRent = useMode==='rent'?(parseFloat(document.getElementById('rent').value)||0):0;
+  const lbuy    = parseFloat(document.getElementById('lbuy').value)||0;
+  const val     = parseFloat(document.getElementById('val').value)||0;
+  const mstamp  = parseFloat(document.getElementById('mstamp').value)||0;
+  const arate   = parseFloat(document.getElementById('arate').value)||0;
+  const lsell   = parseFloat(document.getElementById('lsell').value)||0;
+  const misc    = parseFloat(document.getElementById('misc').value)||0;
+
+  const reg = ssdRegime(purchaseDate);
+  const regLbl = { new:'New SSD (≥ 4 Jul 2025)', old:'Old SSD (11 Mar 2017–3 Jul 2025)', pre2017:'Pre-2017 — no SSD' };
+  const regCls = { new:'bi', old:'bw', pre2017:'bs' };
+  if (riEl) riEl.innerHTML = `<span class="badge ${regCls[reg]}">${regLbl[reg]}</span><span class="badge bi">Hold: ${holdMo} months (${holdYrs.toFixed(1)} yrs)</span>`;
+
+  const { tax:bsd, bd:bsdBd } = calcBSD(pp);
+  const absdRate = ABSD[ctz][Math.min(pc,3)]||0;
+  const absd = pp*absdRate;
+  const { tax:ssd, label:ssdLbl } = calcSSD(spv, purchaseDate, saleDate);
+  const mort = calcMort(pp, ltv, mrate, holdMo, lterm);
+
+  const totalMaint    = mcost*holdMo;
+  const totalPtax     = ptax*holdMo/12;
+  const totalRent     = monthlyRent*holdMo;
+  const agentFee      = spv*(arate/100);
+  const downPayment   = pp*(1-ltv/100);
+  const grossPnl      = spv-pp;
+  const totalTransCosts = bsd+absd+lbuy+val+mstamp+ssd+agentFee+lsell+misc;
+  const totalHolding  = mort.ti+totalMaint+totalPtax;
+  const netPnl        = grossPnl-totalTransCosts-totalHolding+totalRent;
+  const initialOutlay = downPayment+bsd+absd+lbuy+val+mstamp;
+  const ann    = annRet(netPnl, initialOutlay, holdMo);
+  const annStr = ann===null?'—':(ann>=0?'+':'')+ann.toFixed(2)+'% p.a.';
+  const hpr    = initialOutlay>0?(netPnl/initialOutlay*100).toFixed(1)+'%':'—';
+
+  /* IRR — true time-value return on all cash flows */
+  const netSaleProceeds = spv - mort.bal - ssd - agentFee - lsell - misc;
+  const irr    = calcIRR(initialOutlay, mort.mp, mcost, ptax/12, netSaleProceeds, holdMo);
+  const irrStr = irr===null?'—':(irr>=0?'+':'')+irr.toFixed(2)+'% p.a.';
+
+  /* Plain-English verdict */
+  const plainEl = document.getElementById('plain-summary');
+  if (plainEl) plainEl.innerHTML = buildPlainSummary({
+    pp, spv, netPnl, grossPnl, initialOutlay, holdMo,
+    bsd, absd, ssd, mort, totalMaint, totalPtax, totalRent,
+    agentFee, lsell, misc, lbuy, val, mstamp,
+    annStr, irrStr, irr, hpr, useMode, monthlyRent,
+    ctz, pc, ltv, mrate, lterm, absdRate
+  });
+
+  /* Ticker */
+  const tkGross = document.getElementById('tk-gross');
+  const tkNet   = document.getElementById('tk-net');
+  const tkAnn   = document.getElementById('tk-ann');
+  const tkIrr   = document.getElementById('tk-irr');
+  if (tkGross) { tkGross.textContent = fmt(grossPnl); tkGross.className = 't-val '+(grossPnl>=0?'pos':'neg'); }
+  if (tkNet)   { tkNet.textContent   = fmt(netPnl);   tkNet.className   = 't-val '+(netPnl>=0?'pos':'neg'); }
+  if (tkAnn)   { tkAnn.textContent   = annStr;        tkAnn.className   = 't-val '+(ann===null?'neu':ann>=0?'pos':'neg'); }
+  if (tkIrr)   { tkIrr.textContent   = irrStr;        tkIrr.className   = 't-val '+(irr===null?'neu':irr>=0?'pos':'neg'); }
+
+  /* ABSD preview */
+  const absdBadge = absdRate>=.6?'bd':absdRate>=.2?'bw':absdRate>0?'bi':'bs';
+  const apEl = document.getElementById('absd-preview');
+  /* FIX 4: Show ABSD rate always; show amount when price is entered */
+  const absdAmountStr = absdRate > 0
+    ? (pp > 0 ? `ABSD ${(absdRate*100).toFixed(0)}% = ${fA(absd)}` : `ABSD ${(absdRate*100).toFixed(0)}% — enter price to see amount`)
+    : null;
+  if (apEl) apEl.innerHTML =
+    `<span class="badge bi">${ABSD_LBL[ctz]}</span>`+
+    (absdRate>0 ? `<span class="badge ${absdBadge}">${absdAmountStr}</span>` : '<span class="badge bs">ABSD: Nil</span>')+
+    (pp>0 && ssd>0 ? `<span class="badge bw">SSD: ${ssdLbl}</span>` : pp>0 ? '<span class="badge bs">SSD: Nil</span>' : '');
+
+  /* FIX #6: ABSD high-rate alert */
+  const alertEl = document.getElementById('absd-alert');
+  if (alertEl) alertEl.className = 'absd-alert'+(absdRate>=.20?' show':'');
+
+  /* FIX 5: Gate results banner — only show when purchase AND sale price are entered */
+  const bannerEl = document.getElementById('results-prompt');
+  if (bannerEl) bannerEl.style.display = (pp > 0 && spv > 0) ? 'flex' : 'none';
+
+  /* PNL summary */
+  const ncol = useMode==='rent'?'g5':'g4';
+  const pnlEl = document.getElementById('pnl-summary');
+  if (pnlEl) pnlEl.innerHTML = `
+    <div class="card">
+      <p class="card-title">P&L summary</p>
+      <div class="${ncol}" style="margin-bottom:10px">
+        <div class="m"><div class="ml">Gross PNL</div><div class="mv ${grossPnl>=0?'pos':'neg'}">${fmt(grossPnl)}</div><div class="ms">${pct(grossPnl,pp)} of purchase price</div></div>
+        ${useMode==='rent'?`<div class="m"><div class="ml">Rental income</div><div class="mv pos">+${fA(totalRent)}</div><div class="ms">${fA(monthlyRent)}/mo × ${holdMo}mo</div></div>`:''}
+        <div class="m"><div class="ml">Total costs</div><div class="mv neu">-${fA(totalTransCosts+totalHolding)}</div><div class="ms">Stamp duty + fees + interest + holding</div></div>
+        <div class="m"><div class="ml">Net PNL</div><div class="mv ${netPnl>=0?'pos':'neg'}">${fmt(netPnl)}</div><div class="ms">${hpr} on initial outlay</div></div>
+      </div>
+      <div class="g4">
+        <div class="m"><div class="ml">Initial cash outlay</div><div class="mv neu">${fmt(initialOutlay)}</div><div class="ms">Down pmt ${fA(downPayment)} + buy costs ${fA(bsd+absd+lbuy+val+mstamp)}</div></div>
+        <div class="m"><div class="ml">
+          <span class="tip-wrap" style="color:inherit">HPR (on cash outlay)
+            <span class="tip-icon" style="font-size:8px">?</span>
+            <span class="tip-popup">Holding Period Return: Net PNL ÷ initial cash outlay (down payment + upfront costs). This is your equity return, amplified by leverage. Does NOT account for monthly mortgage payments.</span>
+          </span>
+        </div><div class="mv ${netPnl>=0?'pos':'neg'}">${(netPnl>=0?'+':'')+hpr}</div><div class="ms">Net PNL ÷ initial outlay</div></div>
+        <div class="m"><div class="ml">
+          <span class="tip-wrap" style="color:inherit">Ann. return (on equity)
+            <span class="tip-icon" style="font-size:8px">?</span>
+            <span class="tip-popup">HPR annualised using compound growth. Based only on initial cash outlay — does NOT account for monthly mortgage payments during the hold period.</span>
+          </span>
+        </div><div class="mv ${netPnl>=0?'pos':'neg'}">${annStr}</div><div class="ms">HPR annualised · ${holdMo}mo</div></div>
+        <div class="m"><div class="ml">
+          <span class="tip-wrap" style="color:inherit">IRR (all cash flows)
+            <span class="tip-icon" style="font-size:8px">?</span>
+            <span class="tip-popup">Internal Rate of Return — accounts for ALL cash outflows (monthly mortgage P+I, maintenance, property tax) and the final sale proceeds. This is the most accurate measure of your true investment return.</span>
+          </span>
+        </div><div class="mv ${irr===null?'neu':irr>=0?'pos':'neg'}">${irrStr}</div><div class="ms">True time-value return</div></div>
+      </div>
+    </div>`;
+
+  /* Purchase breakdown */
+  const buyEl = document.getElementById('buy-bd');
+  if (buyEl) buyEl.innerHTML = `
+    <div class="r"><span class="n">Purchase price</span><span class="v">${fmt(pp)}</span></div>
+    <div class="r sub"><span class="n">Down payment (${(100-ltv).toFixed(0)}%)</span><span class="v">${fA(downPayment)}</span></div>
+    <div class="r sub"><span class="n">Loan (${ltv.toFixed(0)}% LTV · ${lterm}yr)</span><span class="v">${fA(mort.loan)}</span></div>
+    <hr class="dv"><div class="sub-hdr">Upfront costs</div>
+    <div class="r"><span class="n"><span class="tip-wrap">BSD (Buyer's Stamp Duty)<span class="tip-icon">?</span><span class="tip-popup">Tiered tax on purchase price: 1% on first S$180K, rising to 6% above S$3M.</span></span></span><span class="v">-${fA(bsd)}</span></div>
+    <div class="r"><span class="n"><span class="tip-wrap">ABSD (Additional BSD)<span class="tip-icon">?</span><span class="tip-popup">Extra stamp duty based on buyer citizenship and number of properties owned. Flat rate on full purchase price.</span></span></span><span class="v">${absd>0?'-'+fA(absd):'<span class="pos">Nil</span>'}</span></div>
+    <div class="r"><span class="n">Legal / conveyancing</span><span class="v">-${fA(lbuy)}</span></div>
+    <div class="r"><span class="n">Valuation + mortgage stamp</span><span class="v">-${fA(val+mstamp)}</span></div>
+    <div class="r tot"><span class="n">Initial cash outlay</span><span class="v">${fmt(initialOutlay)}</span></div>
+    <hr class="dv"><div class="sub-hdr">Mortgage — monthly ${fA(mort.mp)}</div>
+    <div class="r"><span class="n neg">Interest paid (cost)</span><span class="v neg">-${fA(mort.ti)}</span></div>
+    <div class="r sub"><span class="n">Principal repaid (equity)</span><span class="v">${fA(mort.tp)}</span></div>
+    <div class="r sub"><span class="n">Remaining loan at sale</span><span class="v">-${fA(mort.bal)}</span></div>
+    <hr class="dv">
+    <div class="r"><span class="n">Maintenance & misc</span><span class="v">-${fA(totalMaint)}</span></div>
+    <div class="r"><span class="n">Property tax</span><span class="v">-${fA(totalPtax)}</span></div>
+    ${useMode==='rent'?`<div class="r"><span class="n pos">Rental income</span><span class="v pos">+${fA(totalRent)}</span></div>`:''}`;
+
+  /* Sale breakdown */
+  const sellEl = document.getElementById('sell-bd');
+  if (sellEl) sellEl.innerHTML = `
+    <div class="r"><span class="n">Sale price</span><span class="v">${fmt(spv)}</span></div>
+    <div class="r"><span class="n">Loan repaid at sale</span><span class="v">-${fA(mort.bal)}</span></div>
+    <div class="r tot"><span class="n">Net sale proceeds</span><span class="v">${fmt(spv-mort.bal)}</span></div>
+    <hr class="dv">
+    <div class="r"><span class="n"><span class="tip-wrap">SSD (Seller's Stamp Duty)<span class="tip-icon">?</span><span class="tip-popup">Tax on sale if you sell within the SSD holding window. Nil if held long enough — shown by the regime badge on Tab 2.</span></span></span><span class="v">${ssd>0?'-'+fA(ssd):'<span class="pos">Nil</span>'}</span></div>
+    <div class="r"><span class="n">Agent (${arate}%) + legal + misc</span><span class="v">-${fA(agentFee+lsell+misc)}</span></div>
+    <hr class="dv">
+    <div class="r sub"><span class="n">Transaction costs</span><span class="v">-${fA(totalTransCosts)}</span></div>
+    <div class="r sub"><span class="n">Mortgage interest</span><span class="v">-${fA(mort.ti)}</span></div>
+    <div class="r sub"><span class="n">Maintenance + property tax</span><span class="v">-${fA(totalMaint+totalPtax)}</span></div>
+    ${useMode==='rent'?`<div class="r sub"><span class="n pos">Rental income</span><span class="v pos">+${fA(totalRent)}</span></div>`:''}
+    <div class="r tot"><span class="n">Net PNL</span><span class="v ${netPnl>=0?'pos':'neg'}" style="font-size:15px">${fmt(netPnl)}</span></div>
+    <div class="r"><span class="n">Ann. return on cash outlay</span><span class="v ${netPnl>=0?'pos':'neg'}">${annStr}</span></div>
+    <div class="r"><span class="n">IRR (all cash flows)</span><span class="v ${irr===null?'neu':irr>=0?'pos':'neg'}">${irrStr}</span></div>`;
+
+  /* Stamp duty detail */
+  const sdEl = document.getElementById('sd-detail');
+  if (sdEl) {
+    let h = `<div style="margin-bottom:10px;display:flex;flex-wrap:wrap;gap:4px">
+      <span class="badge bi">${pc===1?'1st':pc===2?'2nd':'3rd+'} · ${ABSD_LBL[ctz]}</span>
+      ${absd>0?`<span class="badge ${absdBadge}">ABSD ${(absdRate*100).toFixed(0)}%</span>`:'<span class="badge bs">ABSD: Nil</span>'}
+      ${ssd>0?`<span class="badge bw">SSD: ${ssdLbl}</span>`:'<span class="badge bs">SSD: Nil</span>'}
+    </div>
+    <div class="sub-hdr">BSD (Buyer's Stamp Duty) — on purchase price ${fA(pp)}</div>
+    <div class="sdg"><span class="sdg-hdr">Band</span><span class="sdg-hdr">Rate</span><span class="sdg-hdr" style="text-align:right">Tax</span>`;
+    for (const b of bsdBd) h += `<span style="color:var(--txt2)">${b.label}</span><span style="color:var(--txt2)">${b.rate}</span><span style="text-align:right;font-weight:500;font-family:'JetBrains Mono',monospace">${fA(b.amt)}</span>`;
+    h += `</div><div class="r tot"><span class="n">Total BSD</span><span class="v">-${fA(bsd)}</span></div><hr class="dv"><div class="sub-hdr">ABSD (Additional Buyer's Stamp Duty)</div>`;
+    h += absd>0
+      ? `<div class="sdg"><span style="color:var(--txt2)">On full purchase price</span><span style="color:var(--txt2)">${(absdRate*100).toFixed(0)}%</span><span style="text-align:right;font-weight:500;font-family:'JetBrains Mono',monospace">${fA(absd)}</span></div><div class="r tot"><span class="n">Total ABSD</span><span class="v">-${fA(absd)}</span></div>`
+      : `<div style="font-size:12px;color:var(--green)">Nil — ${ABSD_LBL[ctz]} buying first property.</div>`;
+    h += `<hr class="dv"><div class="sub-hdr">SSD (Seller's Stamp Duty) — on sale price ${fA(spv)}</div>`;
+    h += ssd>0
+      ? `<div class="sdg"><span style="color:var(--txt2)">Held ${holdMo} months</span><span style="color:var(--txt2)">${ssdLbl}</span><span style="text-align:right;font-weight:500;font-family:'JetBrains Mono',monospace">${fA(ssd)}</span></div><div class="r tot"><span class="n">Total SSD</span><span class="v neg">-${fA(ssd)}</span></div><p class="note">New regime (≥4 Jul 2025): 16% ≤1yr · 12% 1–2yr · 8% 2–3yr · 4% 3–4yr · Nil &gt;4yr. ⚠ Under the new regime, a 3-year hold still attracts 8% SSD — you need to hold &gt;4 years for Nil. Old regime (pre Jul 2025): 12/8/4% over 3yr only.</p>`
+      : `<div style="font-size:12px;color:var(--green)">Nil — held beyond SSD window${reg==='pre2017'?' (pre-2017)':reg==='new'?' (>4 years)':' (>3 years)'}.</div>`;
+    sdEl.innerHTML = h;
+  }
+
+  /* Benchmarks */
+  const bmRows = [{ id:'property', name:'Property (this deal)', src:'net of all costs & taxes', profit:netPnl, ann }];
+  for (const bm of BMS) {
+    const profit = bmProfit(initialOutlay, purchaseDate, saleDate, bm.id);
+    bmRows.push({ id:bm.id, name:bm.name, src:bm.src, profit, ann:annRet(profit,initialOutlay,holdMo) });
+  }
+  bmRows.sort((a,b)=>b.profit-a.profit);
+  if (document.getElementById('bm-rows')) renderBmRows(bmRows, netPnl);
+
+  /* Waterfall */
+  const bars=[]; let run=0;
+  function bar(l,v,c){bars.push({l,v,s:v<0?run+v:run,c});run+=v;}
+  bar('Purchase',pp,'#1F6FEB');
+  if(bsd>0)  bar('BSD',-bsd,'#F85149');
+  if(absd>0) bar('ABSD',-absd,'#FF7B72');
+  const upf=lbuy+val+mstamp; if(upf>0) bar('Buy costs',-upf,'#D29922');
+  if(mort.ti>0) bar('Interest',-mort.ti,'#D29922');
+  const hc=totalMaint+totalPtax; if(hc>0) bar('Holding',-hc,'#D29922');
+  if(totalRent>0) bar('Rent',totalRent,'#3FB950');
+  if(ssd>0) bar('SSD',-ssd,'#F85149');
+  const sc=agentFee+lsell+misc; if(sc>0) bar('Sell costs',-sc,'#D29922');
+  bar('Price gain',spv-pp,spv>=pp?'#3FB950':'#F85149');
+  /* Net PNL: a summary bar anchored at 0 spanning to netPnl — drawn as full-height with dashed border */
+  bars.push({l:'Net PNL',v:netPnl,s:Math.min(0,netPnl),isSummary:true,c:netPnl>=0?'#3FB950':'#F85149'});
+  if(currentTab===3) renderWF(bars);
+}
+
+/* ─── Init ─── */
+buildBmCfg();
+document.querySelectorAll('input, select').forEach(el => el.addEventListener('input', render));
+
+/* FIX 4: Smart tooltip positioning — use mouseover to compute fixed coords */
+document.addEventListener('mouseover', e => {
+  const icon = e.target.closest('.tip-icon');
+  if (!icon) return;
+  const popup = icon.closest('.tip-wrap')?.querySelector('.tip-popup');
+  if (!popup) return;
+  const ir = icon.getBoundingClientRect();
+  popup.style.top = '';
+  popup.style.bottom = '';
+  popup.style.left = '';
+  popup.style.right = '';
+  /* Position above the icon by default */
+  const spaceAbove = ir.top;
+  const spaceBelow = window.innerHeight - ir.bottom;
+  if (spaceAbove >= 80) {
+    popup.style.bottom = (window.innerHeight - ir.top + 6) + 'px';
+  } else {
+    popup.style.top = (ir.bottom + 6) + 'px';
+  }
+  /* Horizontal: prefer left-aligned, but flip if it would overflow */
+  const popW = Math.min(240, window.innerWidth - 24);
+  if (ir.left + popW > window.innerWidth - 12) {
+    popup.style.right = (window.innerWidth - ir.right) + 'px';
+  } else {
+    popup.style.left = ir.left + 'px';
+  }
+});
+
+/* Ensure ticker shows live values on every load, not "—" dashes */
+(function initTicker() {
+  const pp  = parseFloat(document.getElementById('pp')?.value)||0;
+  const spv = parseFloat(document.getElementById('sp')?.value)||0;
+  const gp  = spv - pp;
+  const tg  = document.getElementById('tk-gross');
+  const tn  = document.getElementById('tk-net');
+  if (tg && pp > 0) { tg.textContent = fmt(gp); tg.className = 't-val '+(gp>=0?'pos':'neg'); }
+  if (tn && pp > 0) { tn.textContent = fmt(gp); tn.className = 't-val '+(gp>=0?'pos':'neg'); }
+})();
+
+render();
+</script>
+</body>
+</html>
